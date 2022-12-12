@@ -6,6 +6,7 @@ import {
 } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 import * as path from "path";
+import { apiRoutes } from "./apiRoutes";
 
 interface LambdaProps {
   bundling: BundlingOptions;
@@ -27,7 +28,6 @@ class LambdaConstruct extends Construct {
   ) {
     super(scope, id);
     this.functionName = name;
-    console.log('name',name, id);
     this.lambda = new NodejsFunction(scope, name, {
       functionName: name,
       ...props,
@@ -40,6 +40,7 @@ const getNodejsFunction = (
   id: string,
   subfolder: string,
   functionName: string,
+  functionPath: string,
   extraProps: NodejsFunctionProps
 ) => {
   const lambdaProps: LambdaProps = {
@@ -52,14 +53,14 @@ const getNodejsFunction = (
 
   return new LambdaConstruct(
     stack,
-    id,
+    `${id}-${functionName}`,
     `Ss-Func${functionName.charAt(0).toUpperCase()}${functionName.slice(1)}`,
     {
       ...lambdaProps,
       ...extraProps,
       entry: path.resolve(
         __dirname,
-        `../lambda/${subfolder}/${functionName}.ts`
+        `../lambda/${subfolder}/${functionPath}.ts`
       ),
     }
   ).lambda;
@@ -69,7 +70,17 @@ export const getAPIFunctions = (
   stack: Stack,
   id: string
 ): { [key: string]: NodejsFunction } => {
-  return {
-    helloFunction: getNodejsFunction(stack, id, "api", "hello", {}),
-  };
+  return Object.keys(apiRoutes).reduce((prev, lambda) => {
+    return {
+      ...prev,
+      [lambda]: getNodejsFunction(
+        stack,
+        id,
+        "api",
+        lambda,
+        apiRoutes[lambda].handlerPath,
+        {}
+      ),
+    };
+  }, {});
 };
